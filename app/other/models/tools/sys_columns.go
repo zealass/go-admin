@@ -1,7 +1,8 @@
 package tools
 
 import (
-	"go-admin/app/admin/models"
+	common "go-admin/common/models"
+
 	"gorm.io/gorm"
 )
 
@@ -44,10 +45,10 @@ type SysColumns struct {
 	CreateBy           int          `gorm:"column:create_by;size:20;" json:"createBy"`
 	UpdateBy           int          `gorm:"column:update_By;size:20;" json:"updateBy"`
 
-	models.BaseModel
+	common.ModelTime
 }
 
-func (SysColumns) TableName() string {
+func (*SysColumns) TableName() string {
 	return "sys_columns"
 }
 
@@ -56,7 +57,7 @@ func (e *SysColumns) GetList(tx *gorm.DB, exclude bool) ([]SysColumns, error) {
 	table := tx.Table("sys_columns")
 	table = table.Where("table_id = ? ", e.TableId)
 	if exclude {
-		notIn := make([]string, 6)
+		notIn := make([]string, 0, 6)
 		notIn = append(notIn, "id")
 		notIn = append(notIn, "create_by")
 		notIn = append(notIn, "update_by")

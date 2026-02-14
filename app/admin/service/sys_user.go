@@ -127,8 +127,7 @@ func (e *SysUser) UpdateAvatar(c *dto.UpdateSysUserAvatarReq, p *actions.DataPer
 		return errors.New("无权更新该数据")
 
 	}
-	c.Generate(&model)
-	err = e.Orm.Save(&model).Error
+	err = e.Orm.Table(model.TableName()).Where("user_id =? ", c.UserId).Updates(c).Error
 	if err != nil {
 		e.Log.Errorf("Service UpdateSysUser error: %s", err)
 		return err
@@ -151,8 +150,7 @@ func (e *SysUser) UpdateStatus(c *dto.UpdateSysUserStatusReq, p *actions.DataPer
 		return errors.New("无权更新该数据")
 
 	}
-	c.Generate(&model)
-	err = e.Orm.Save(&model).Error
+	err = e.Orm.Table(model.TableName()).Where("user_id =? ", c.UserId).Updates(c).Error
 	if err != nil {
 		e.Log.Errorf("Service UpdateSysUser error: %s", err)
 		return err
@@ -175,7 +173,7 @@ func (e *SysUser) ResetPwd(c *dto.ResetSysUserPwdReq, p *actions.DataPermission)
 		return errors.New("无权更新该数据")
 	}
 	c.Generate(&model)
-	err = e.Orm.Save(&model).Error
+	err = e.Orm.Omit("username", "nick_name", "phone", "role_id", "avatar", "sex").Save(&model).Error
 	if err != nil {
 		e.Log.Errorf("At Service ResetSysUserPwd error: %s", err)
 		return err
@@ -235,7 +233,9 @@ func (e *SysUser) UpdatePwd(id int, oldPassword, newPassword string, p *actions.
 		return err
 	}
 	c.Password = newPassword
-	db := e.Orm.Model(c).Where("user_id = ?", id).Select("Password", "Salt").Updates(c)
+	db := e.Orm.Model(c).Where("user_id = ?", id).
+		Select("Password", "Salt").
+		Updates(c)
 	if err = db.Error; err != nil {
 		e.Log.Errorf("db error: %s", err)
 		return err

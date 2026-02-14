@@ -3,6 +3,7 @@ package apis
 import (
 	"github.com/gin-gonic/gin/binding"
 	"go-admin/app/admin/models"
+	"golang.org/x/crypto/bcrypt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +31,7 @@ type SysUser struct {
 // @Security Bearer
 func (e SysUser) GetPage(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.SysUserGetPageReq{}
+	req := dto.SysUserGetPageReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req).
@@ -67,7 +68,7 @@ func (e SysUser) GetPage(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) Get(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.SysUserById{}
+	req := dto.SysUserById{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, nil).
@@ -101,7 +102,7 @@ func (e SysUser) Get(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) Insert(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.SysUserInsertReq{}
+	req := dto.SysUserInsertReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON).
@@ -136,7 +137,7 @@ func (e SysUser) Insert(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) Update(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.SysUserUpdateReq{}
+	req := dto.SysUserUpdateReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req).
@@ -171,7 +172,7 @@ func (e SysUser) Update(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) Delete(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.SysUserById{}
+	req := dto.SysUserById{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON).
@@ -208,7 +209,7 @@ func (e SysUser) Delete(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) InsetAvatar(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.UpdateSysUserAvatarReq{}
+	req := dto.UpdateSysUserAvatarReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		MakeService(&s.Service).
@@ -257,7 +258,7 @@ func (e SysUser) InsetAvatar(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) UpdateStatus(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.UpdateSysUserStatusReq{}
+	req := dto.UpdateSysUserStatusReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON, nil).
@@ -294,7 +295,7 @@ func (e SysUser) UpdateStatus(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) ResetPwd(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.ResetSysUserPwdReq{}
+	req := dto.ResetSysUserPwdReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON).
@@ -320,7 +321,7 @@ func (e SysUser) ResetPwd(c *gin.Context) {
 }
 
 // UpdatePwd
-// @Summary 重置密码
+// @Summary 修改密码
 // @Description 获取JSON
 // @Tags 用户
 // @Accept  application/json
@@ -331,7 +332,7 @@ func (e SysUser) ResetPwd(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) UpdatePwd(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.PassWord{}
+	req := dto.PassWord{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req).
@@ -345,6 +346,10 @@ func (e SysUser) UpdatePwd(c *gin.Context) {
 
 	// 数据权限检查
 	p := actions.GetPermissionFromContext(c)
+	var hash []byte
+	if hash, err = bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost); err != nil {
+		req.NewPassword = string(hash)
+	}
 
 	err = s.UpdatePwd(user.GetUserId(c), req.OldPassword, req.NewPassword, p)
 	if err != nil {
@@ -352,6 +357,7 @@ func (e SysUser) UpdatePwd(c *gin.Context) {
 		e.Error(http.StatusForbidden, err, "密码修改失败")
 		return
 	}
+
 	e.OK(nil, "密码修改成功")
 }
 
@@ -364,7 +370,7 @@ func (e SysUser) UpdatePwd(c *gin.Context) {
 // @Security Bearer
 func (e SysUser) GetProfile(c *gin.Context) {
 	s := service.SysUser{}
-	req :=dto.SysUserById{}
+	req := dto.SysUserById{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		MakeService(&s.Service).
@@ -401,7 +407,7 @@ func (e SysUser) GetProfile(c *gin.Context) {
 // @Router /api/v1/getinfo [get]
 // @Security Bearer
 func (e SysUser) GetInfo(c *gin.Context) {
-	req :=dto.SysUserById{}
+	req := dto.SysUserById{}
 	s := service.SysUser{}
 	r := service.SysRole{}
 	err := e.MakeContext(c).
@@ -444,7 +450,7 @@ func (e SysUser) GetInfo(c *gin.Context) {
 	if sysUser.Avatar != "" {
 		mp["avatar"] = sysUser.Avatar
 	}
-	mp["userName"] = sysUser.NickName
+	mp["userName"] = sysUser.Username
 	mp["userId"] = sysUser.UserId
 	mp["deptId"] = sysUser.DeptId
 	mp["name"] = sysUser.NickName

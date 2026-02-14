@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+
 	"github.com/go-admin-team/go-admin-core/sdk/service"
 	"gorm.io/gorm"
 
@@ -45,7 +46,7 @@ func (e *SysDictType) Get(d *dto.SysDictTypeGetReq, model *models.SysDictType) e
 		e.Log.Errorf("db error: %s", err)
 		return err
 	}
-	if db.Error != nil {
+	if err = db.Error; err != nil {
 		e.Log.Errorf("db error: %s", err)
 		return err
 	}
@@ -60,7 +61,7 @@ func (e *SysDictType) Insert(c *dto.SysDictTypeInsertReq) error {
 	var count int64
 	e.Orm.Model(&data).Where("dict_type = ?", data.DictType).Count(&count)
 	if count > 0 {
-		return errors.New(fmt.Sprintf("当前字典类型[%s]已经存在！", data.DictType))
+		return fmt.Errorf("当前字典类型[%s]已经存在！", data.DictType)
 	}
 	err = e.Orm.Create(&data).Error
 	if err != nil {
@@ -77,7 +78,7 @@ func (e *SysDictType) Update(c *dto.SysDictTypeUpdateReq) error {
 	e.Orm.First(&model, c.GetId())
 	c.Generate(&model)
 	db := e.Orm.Save(&model)
-	if db.Error != nil {
+	if err = db.Error; err != nil {
 		e.Log.Errorf("db error: %s", err)
 		return err
 	}
@@ -94,8 +95,7 @@ func (e *SysDictType) Remove(d *dto.SysDictTypeDeleteReq) error {
 	var data models.SysDictType
 
 	db := e.Orm.Delete(&data, d.GetId())
-	if db.Error != nil {
-		err = db.Error
+	if err = db.Error; err != nil {
 		e.Log.Errorf("Delete error: %s", err)
 		return err
 	}

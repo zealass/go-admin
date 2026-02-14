@@ -6,12 +6,11 @@ import (
 
 	"github.com/go-admin-team/go-admin-core/sdk/runtime"
 	"github.com/go-admin-team/go-admin-core/sdk/service"
-	"gorm.io/gorm"
-
 	"go-admin/app/admin/models"
 	"go-admin/app/admin/service/dto"
 	"go-admin/common/actions"
 	cDto "go-admin/common/dto"
+	"go-admin/common/global"
 )
 
 type SysApi struct {
@@ -23,13 +22,25 @@ func (e *SysApi) GetPage(c *dto.SysApiGetPageReq, p *actions.DataPermission, lis
 	var err error
 	var data models.SysApi
 
-	err = e.Orm.Debug().Model(&data).
+	orm := e.Orm.Debug().Model(&data).
 		Scopes(
 			cDto.MakeCondition(c.GetNeedSearch()),
 			cDto.Paginate(c.GetPageSize(), c.GetPageIndex()),
 			actions.Permission(data.TableName(), p),
-		).
-		Find(list).Limit(-1).Offset(-1).
+		)
+	if c.Type != "" {
+		qType := c.Type
+		if qType == "暂无" {
+			qType = ""
+		}
+		if global.Driver == "postgres" {
+			orm = orm.Where("type = ?", qType)
+		} else {
+			orm = orm.Where("`type` = ?", qType)
+		}
+
+	}
+	err = orm.Find(list).Limit(-1).Offset(-1).
 		Count(count).Error
 	if err != nil {
 		e.Log.Errorf("Service GetSysApiPage error:%s", err)
@@ -45,15 +56,15 @@ func (e *SysApi) Get(d *dto.SysApiGetReq, p *actions.DataPermission, model *mode
 		Scopes(
 			actions.Permission(data.TableName(), p),
 		).
-		First(model, d.GetId()).Error
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		err = errors.New("查看对象不存在或无权查看")
-		e.Log.Errorf("Service GetSysApi error:%s", err)
+		FirstOrInit(model, d.GetId()).Error
+	if err != nil {
+		e.Log.Errorf("db error:%s", err)
 		_ = e.AddError(err)
 		return e
 	}
-	if err != nil {
-		e.Log.Errorf("db error:%s", err)
+	if model.Id == 0 {
+		err = errors.New("查看对象不存在或无权查看")
+		e.Log.Errorf("Service GetSysApi error: %s", err)
 		_ = e.AddError(err)
 		return e
 	}

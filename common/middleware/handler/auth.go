@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"go-admin/app/admin/models"
 	"go-admin/common"
 	"net/http"
@@ -16,8 +15,6 @@ import (
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth/user"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"github.com/mssola/user_agent"
-	gaConfig "go-admin/config"
-
 	"go-admin/common/global"
 )
 
@@ -96,11 +93,11 @@ func Authenticator(c *gin.Context) (interface{}, error) {
 			return nil, jwt.ErrInvalidVerificationode
 		}
 	}
-	user, role, e := loginVals.GetUser(db)
+	sysUser, role, e := loginVals.GetUser(db)
 	if e == nil {
 		username = loginVals.Username
 
-		return map[string]interface{}{"user": user, "role": role}, nil
+		return map[string]interface{}{"user": sysUser, "role": role}, nil
 	} else {
 		msg = "登录失败"
 		status = "1"
@@ -119,8 +116,7 @@ func LoginLogToDB(c *gin.Context, status string, msg string, username string) {
 
 	ua := user_agent.New(c.Request.UserAgent())
 	l["ipaddr"] = common.GetClientIP(c)
-	fmt.Println("gaConfig.ExtConfig.AMap.Key", gaConfig.ExtConfig.AMap.Key)
-	l["loginLocation"] = pkg.GetLocation(common.GetClientIP(c),gaConfig.ExtConfig.AMap.Key)
+	l["loginLocation"] = "" // pkg.GetLocation(common.GetClientIP(c),gaConfig.ExtConfig.AMap.Key)
 	l["loginTime"] = pkg.GetCurrentTime()
 	l["status"] = status
 	l["remark"] = c.Request.UserAgent()

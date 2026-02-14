@@ -2,18 +2,19 @@ package apis
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/v3/net"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
-	_ "github.com/go-admin-team/go-admin-core/sdk/pkg/response"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 const (
@@ -23,94 +24,160 @@ const (
 	GB = 1024 * MB
 )
 
+var excludeNetInterfaces = []string{
+	"lo", "tun", "docker", "veth", "br-", "vmbr", "vnet", "kube",
+}
+
 type ServerMonitor struct {
 	api.Api
 }
 
-//获取相差时间
+// GetHourDiffer 获取相差时间
 func GetHourDiffer(startTime, endTime string) int64 {
-	var hour int64
-	t1, err := time.ParseInLocation("2006-01-02 15:04:05", startTime, time.Local)
-	t2, err := time.ParseInLocation("2006-01-02 15:04:05", endTime, time.Local)
-	if err == nil && t1.Before(t2) {
-		diff := t2.Unix() - t1.Unix() //
-		hour = diff / 3600
-		return hour
-	} else {
-		return hour
+	t1, err1 := time.ParseInLocation("2006-01-02 15:04:05", startTime, time.Local)
+	t2, err2 := time.ParseInLocation("2006-01-02 15:04:05", endTime, time.Local)
+	if err1 != nil || err2 != nil || !t1.Before(t2) {
+		return 0
 	}
+	return (t2.Unix() - t1.Unix()) / 3600
 }
 
 // ServerInfo 获取系统信息
-// @Summary 系统信息
-// @Description 获取JSON
-// @Tags 系统信息
-// @Success 200 {object} response.Response "{"code": 200, "data": [...]}"
-// @Router /api/v1/server-monitor [get]
-// @Security Bearer
 func (e ServerMonitor) ServerInfo(c *gin.Context) {
 	e.Context = c
 
-	sysInfo, err := host.Info()
-	osDic := make(map[string]interface{}, 0)
-	osDic["goOs"] = runtime.GOOS
-	osDic["arch"] = runtime.GOARCH
-	osDic["mem"] = runtime.MemProfileRate
-	osDic["compiler"] = runtime.Compiler
-	osDic["version"] = runtime.Version()
-	osDic["numGoroutine"] = runtime.NumGoroutine()
-	osDic["ip"] = pkg.GetLocaHonst()
-	osDic["projectDir"] = pkg.GetCurrentPath()
-	osDic["hostName"] = sysInfo.Hostname
-	osDic["time"] = time.Now().Format("2006-01-02 15:04:05")
+	osInfo := getOSInfo()
+	memInfo := getMemoryInfo()
+	swapInfo := getSwapInfo()
+	cpuInfo := getCPUInfo()
+	diskInfo := getDiskInfo()
+	netInfo := getNetworkInfo()
 
-	dis, _ := disk.Usage("/")
-	diskTotalGB := int(dis.Total) / GB
-	diskFreeGB := int(dis.Free) / GB
-	diskDic := make(map[string]interface{}, 0)
-	diskDic["total"] = diskTotalGB
-	diskDic["free"] = diskFreeGB
+	bootTime, _ := host.BootTime()
+	cachedBootTime := time.Unix(int64(bootTime), 0)
 
-	mem, _ := mem.VirtualMemory()
-	memUsedMB := int(mem.Used) / GB
-	memTotalMB := int(mem.Total) / GB
-	memFreeMB := int(mem.Free) / GB
-	memUsedPercent := int(mem.UsedPercent)
-	memDic := make(map[string]interface{}, 0)
-	memDic["total"] = memTotalMB
-	memDic["used"] = memUsedMB
-	memDic["free"] = memFreeMB
-	memDic["usage"] = memUsedPercent
+	e.Custom(gin.H{
+		"code":     200,
+		"os":       osInfo,
+		"mem":      memInfo,
+		"cpu":      cpuInfo,
+		"disk":     diskInfo,
+		"net":      netInfo,
+		"swap":     swapInfo,
+		"location": "Aliyun",
+		"bootTime": GetHourDiffer(cachedBootTime.Format("2006-01-02 15:04:05"), time.Now().Format("2006-01-02 15:04:05")),
+	})
+}
 
-	cpuDic := make(map[string]interface{}, 0)
-	cpuDic["cpuInfo"], _ = cpu.Info()
+func getOSInfo() map[string]interface{} {
+	sysInfo, _ := host.Info()
+	return map[string]interface{}{
+		"goOs":         runtime.GOOS,
+		"arch":         runtime.GOARCH,
+		"mem":          runtime.MemProfileRate,
+		"compiler":     runtime.Compiler,
+		"version":      runtime.Version(),
+		"numGoroutine": runtime.NumGoroutine(),
+		"ip":           pkg.GetLocalHost(),
+		"projectDir":   pkg.GetCurrentPath(),
+		"hostName":     sysInfo.Hostname,
+		"time":         time.Now().Format("2006-01-02 15:04:05"),
+	}
+}
+
+func getMemoryInfo() map[string]interface{} {
+	memory, _ := mem.VirtualMemory()
+	return map[string]interface{}{
+		"used":    memory.Used / MB,
+		"total":   memory.Total / MB,
+		"percent": pkg.Round(memory.UsedPercent, 2),
+	}
+}
+
+func getSwapInfo() map[string]interface{} {
+	memory, _ := mem.VirtualMemory()
+	return map[string]interface{}{
+		"used":  memory.SwapTotal - memory.SwapFree,
+		"total": memory.SwapTotal,
+	}
+}
+
+func getCPUInfo() map[string]interface{} {
+	cpuInfo, _ := cpu.Info()
 	percent, _ := cpu.Percent(0, false)
-	cpuDic["Percent"] = pkg.Round(percent[0], 2)
-	cpuDic["cpuNum"], _ = cpu.Counts(false)
+	cpuNum, _ := cpu.Counts(false)
+	return map[string]interface{}{
+		"cpuInfo": cpuInfo,
+		"percent": pkg.Round(percent[0], 2),
+		"cpuNum":  cpuNum,
+	}
+}
 
-	//服务器磁盘信息
-	disklist := make([]disk.UsageStat, 0)
-	//所有分区
+func getDiskInfo() map[string]interface{} {
+	var diskTotal, diskUsed, diskUsedPercent float64
+	diskList := make([]disk.UsageStat, 0)
+
 	diskInfo, err := disk.Partitions(true)
 	if err == nil {
 		for _, p := range diskInfo {
 			diskDetail, err := disk.Usage(p.Mountpoint)
 			if err == nil {
 				diskDetail.UsedPercent, _ = strconv.ParseFloat(fmt.Sprintf("%.2f", diskDetail.UsedPercent), 64)
-				diskDetail.Total = diskDetail.Total / 1024 / 1024
-				diskDetail.Used = diskDetail.Used / 1024 / 1024
-				diskDetail.Free = diskDetail.Free / 1024 / 1024
-				disklist = append(disklist, *diskDetail)
+				diskDetail.Total /= MB
+				diskDetail.Used /= MB
+				diskDetail.Free /= MB
+				diskList = append(diskList, *diskDetail)
 			}
 		}
 	}
 
-	e.Custom(gin.H{
-		"code": 200,
-		"os":   osDic,
-		"mem":  memDic,
-		"cpu":  cpuDic,
-		"disk": diskDic,
-		"diskList": disklist,
-	})
+	d, _ := disk.Usage("/")
+	diskTotal = float64(d.Total / GB)
+	diskUsed = float64(d.Used / GB)
+	diskUsedPercent, _ = strconv.ParseFloat(fmt.Sprintf("%.2f", d.UsedPercent), 64)
+
+	return map[string]interface{}{
+		"total":   diskTotal,
+		"used":    diskUsed,
+		"percent": diskUsedPercent,
+	}
+}
+
+func getNetworkInfo() map[string]interface{} {
+	netInSpeed, netOutSpeed := trackNetworkSpeed()
+	return map[string]interface{}{
+		"in":  pkg.Round(float64(netInSpeed/KB), 2),
+		"out": pkg.Round(float64(netOutSpeed/KB), 2),
+	}
+}
+
+func trackNetworkSpeed() (uint64, uint64) {
+	var netInSpeed, netOutSpeed, netInTransfer, netOutTransfer, lastUpdateNetStats uint64
+	nc, err := net.IOCounters(true)
+	if err == nil {
+		for _, v := range nc {
+			if isListContainsStr(excludeNetInterfaces, v.Name) {
+				continue
+			}
+			netInTransfer += v.BytesRecv
+			netOutTransfer += v.BytesSent
+		}
+		now := uint64(time.Now().Unix())
+		diff := now - lastUpdateNetStats
+		if diff > 0 {
+			netInSpeed = (netInTransfer - netInTransfer) / diff
+			netOutSpeed = (netOutTransfer - netOutTransfer) / diff
+		}
+		lastUpdateNetStats = now
+	}
+	return netInSpeed, netOutSpeed
+}
+
+func isListContainsStr(list []string, str string) bool {
+	for _, item := range list {
+		if strings.Contains(str, item) {
+			return true
+		}
+	}
+	return false
 }

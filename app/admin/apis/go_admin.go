@@ -17,7 +17,7 @@ body{
   overflow-y:hidden
 }
 </style>
-<script src="http://libs.baidu.com/jquery/1.9.0/jquery.js"></script>
+<script src="https://libs.baidu.com/jquery/1.9.0/jquery.js"></script>
 <script type="text/javascript"> 
 window.onerror=function(){return true;} 
 $(function(){ 
@@ -28,7 +28,7 @@ $(function(){
 </script>
 </head>
 <body>
-<iframe id="iframe" frameborder="0" src="https://doc.go-admin.dev" style="width:100%;"></iframe>
+<iframe id="iframe" frameborder="0" src="https://www.go-admin.pro" style="width:100%;"></iframe>
 </body>
 </html>
 `

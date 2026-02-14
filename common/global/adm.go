@@ -2,11 +2,10 @@ package global
 
 const (
 	// Version go-admin version info
-	Version = "2.0.6"
+	Version = "2.2.0"
 )
 
 var (
-	Source string
+	// Driver 数据库驱动
 	Driver string
-	DBName string
 )
